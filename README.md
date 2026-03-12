@@ -49,3 +49,51 @@ If you didn't see it, neither did the Bird. The extension only sees what's on th
 - **activeTab** / **tabs** – For popup and opening history.
 - **https://docs.google.com/*** – Schedule (if used).
 - Content scripts run on `*.strobe.gg` and `app.hubspot.com/live-messages/*`.
+
+---
+
+## Getting updates (for friends)
+
+The extension lives in a Git repo so you can always pull the latest version.
+
+**First time (clone the repo):**
+
+```bash
+git clone https://github.com/YOUR_USERNAME/nosey-little-bird.git
+cd nosey-little-bird
+```
+
+Then load the `nosey-little-bird` folder in Chrome as an unpacked extension (see **Installation** above).
+
+**To update your copy when something changes:**
+
+```bash
+cd nosey-little-bird
+git pull
+```
+
+Then go to `chrome://extensions` and click the **Reload** button on Nosey Little Bird.
+
+---
+
+## Pushing to GitHub (repo owner)
+
+1. **Create the repo on GitHub**  
+   Go to [github.com/new](https://github.com/new), name it e.g. `nosey-little-bird`, leave it empty (no README/license).
+
+2. **Connect and push** (from the extension folder):
+
+   ```bash
+   cd /home/chaos/nosey-little-bird
+   git remote add origin https://github.com/YOUR_USERNAME/nosey-little-bird.git
+   git push -u origin main
+   ```
+
+   Replace `YOUR_USERNAME` with your GitHub username. If you use 2FA, use a [Personal Access Token](https://github.com/settings/tokens) as the password when Git asks.
+
+3. **Set your Git identity** (if you haven’t):
+
+   ```bash
+   git config --global user.name "Your Name"
+   git config --global user.email "you@example.com"
+   ```
