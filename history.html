@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>BIRD BRAIN</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 20px; }
+    .stat-card { background: #222; padding: 15px; border-radius: 8px; border: 1px solid #333; text-align: center; }
+    .stat-val { display: block; font-size: 24px; font-weight: bold; color: #ff9800; }
+    .stat-lab { font-size: 10px; color: #666; text-transform: uppercase; margin-top: 5px; }
+    .action-bar { display: flex; justify-content: space-between; align-items: center; background: #1a1a1a; padding: 10px; border-radius: 4px; margin-bottom: 10px; }
+    .btns { display: flex; gap: 8px; }
+    button { padding: 8px 12px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 11px; }
+    #downloadCsv { background: #4caf50; color: white; }
+    #mergeBtn { background: #2196f3; color: white; }
+    #bulkDelete { background: #f44; color: white; }
+    #clear { background: #444; color: white; }
+    table { width: 100%; border-collapse: collapse; background: #222; font-size: 13px; }
+    th { background: #333; color: #999; text-transform: uppercase; font-size: 11px; padding: 12px; text-align: left; }
+    td { padding: 10px 12px; border-bottom: 1px solid #333; }
+    .id-text { color: #ff9800; font-weight: bold; cursor: pointer; }
+    .del-btn { background: #333; border: 1px solid #444; color: #888; cursor: pointer; font-size: 10px; padding: 2px 8px; border-radius: 3px; font-weight: bold; }
+    .del-btn:hover { background: #f44; color: white; }
+    .nav { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 20px; }
+    .nav-btn { background: #333; color: white; padding: 10px 20px; }
+    #userFilter { padding: 8px 12px; background: #222; border: 1px solid #444; color: #eee; border-radius: 4px; font-size: 11px; min-width: 140px; }
+    .disclaimer { font-size: 13px; color: #888; font-style: italic; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>BIRD BRAIN</h1>
+    <span class="disclaimer">Don't trust the Bird blindly - if it didn't see it happen, it may be wrong. If you didn't see it, neither did the Bird. Keep the Unfilled Orders page open to track orders. Check your Paused Orders to see them while in Hub. Click on an order ID to copy it and search on Strobe to update the user.</span>
+  </div>
+  <div class="stats-bar">
+    <div class="stat-card"><span class="stat-val" id="stat-count">0</span><span class="stat-lab">Total Memories</span></div>
+    <div class="stat-card"><span class="stat-val" id="stat-avg">0m 0s</span><span class="stat-lab">Avg Sat Time</span></div>
+    <div class="stat-card"><span class="stat-val" id="stat-top">---</span><span class="stat-lab">Sharpest Beak</span></div>
+  </div>
+  <div class="action-bar">
+    <div class="btns">
+      <select id="userFilter">
+        <option value="">All Users</option>
+      </select>
+      <input type="checkbox" id="selectAll">
+      <button id="bulkDelete">FORGET SELECTED</button>
+    </div>
+    <div class="btns">
+      <input type="file" id="importCsv" accept=".csv" style="display:none">
+      <button id="mergeBtn">ABSORB LORE</button>
+      <button id="downloadCsv">EXTRACT LORE</button>
+      <button id="clear">WIPE BRAIN</button>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th width="30"></th>
+        <th>Order ID</th>
+        <th>Staff</th>
+        <th>Status</th>
+        <th>Born > Gone</th>
+        <th>Sat For</th>
+        <th width="30"></th>
+      </tr>
+    </thead>
+    <tbody id="tableBody"></tbody>
+  </table>
+  <div class="nav">
+    <button id="prev" class="nav-btn">PREVIOUS</button>
+    <span id="pageInfo">1 / 1</span>
+    <button id="next" class="nav-btn">NEXT</button>
+  </div>
+  <script src="history.js"></script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "manifest_version": 3,
+  "name": "Nosey Little Bird! Who Dat? Edition",
+  "short_name": "Who Dat? Bird",
+  "version": "1.3",
+  "description": "Tracks unfilled orders on Strobe.gg and HubSpot with audible alerts when orders sit too long. Shows who's on shift (Nookmart) and backup (Overflow) from a pasted schedule (Mountain time). Popup lists live and recent orders with click-to-copy IDs; full history and CSV export/import; volume control and HubSpot HUD for paused orders.",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://docs.google.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.strobe.gg/*",
+        "https://app.hubspot.com/live-messages/*"
+      ],
+      "js": ["content.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["whistle.mp3", "history.html"],
+      "matches": ["https://*.strobe.gg/*"]
+    }
+  ]
+}

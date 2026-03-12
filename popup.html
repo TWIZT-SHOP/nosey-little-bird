@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { width: 260px; padding: 15px; background: #111; color: white; font-family: sans-serif; }
+    .status-btn { width: 100%; padding: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-bottom: 10px; transition: 0.2s; }
+    /* High Alert is Red (4m), Low Alert is Green (8m) */
+    .high { background: #f44; color: white; border: 2px solid #811; }
+    .medium { background: #ff9800; color: white; border: 2px solid #a60; }
+    .low { background: #4caf50; color: white; border: 2px solid #252; }
+    .off { background: #444; color: #aaa; border: 2px solid #222; }
+
+    .vol-box { background: #222; padding: 10px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #333; }
+    .vol-row { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
+    input[type=range] { flex-grow: 1; accent-color: #ff9800; }
+
+    .test-btn { width: auto; padding: 8px; background: #333; color: #ccc; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
+    .order-box { margin-top: 5px; border: 1px solid #333; border-radius: 4px; background: #000; max-height: 140px; overflow-y: auto; }
+    .btn-nav { width: 100%; padding: 10px; background: #222; border: 1px solid #444; color: #ff9800; font-weight: bold; cursor: pointer; margin-top: 15px; }
+    .label { font-size: 10px; color: #666; text-transform: uppercase; margin-top: 12px; letter-spacing: 0.5px; }
+
+    .item { cursor: pointer; padding: 8px; border-bottom: 1px solid #222; font-size: 11px; display: flex; align-items: center; justify-content: space-between; }
+    .id-text { color: #ff9800; font-weight: bold; }
+    .user-text { color: #888; margin-left: 5px; flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .status-tag { font-size: 8px; padding: 2px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px; }
+    .unfilled { background: #e91e63; color: white; }
+
+    .schedule-box { background: #222; padding: 10px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #333; }
+    .on-shift-display { font-size: 12px; color: #4caf50; font-weight: bold; margin-top: 4px; min-height: 1.2em; }
+    .on-shift-name { cursor: help; text-decoration: underline; text-decoration-style: dotted; }
+    .schedule-details { margin-top: 8px; font-size: 11px; }
+    .schedule-summary { cursor: pointer; color: #ff9800; }
+    .schedule-form { margin-top: 8px; }
+    .schedule-form textarea { width: 100%; min-height: 60px; padding: 6px; background: #111; color: #eee; border: 1px solid #444; border-radius: 4px; margin-top: 4px; font-size: 10px; box-sizing: border-box; }
+  </style>
+</head>
+<body>
+  <button id="threatToggle" class="status-btn high">BIRD ALERT: HIGH (4m)</button>
+
+  <div class="label" style="margin-top:0; margin-bottom:4px;">Current time (Mountain)</div>
+  <div id="mountainTime" class="mountain-time" style="font-size:13px; font-weight:bold; color:#888; margin-bottom:15px;"></div>
+
+  <div class="vol-box">
+    <div class="label" style="margin-top:0">Alarm Volume</div>
+    <div class="vol-row">
+      <input type="range" id="volumeSlider" min="0" max="2" step="0.05" title="0–200%">
+      <button id="testAlarm" class="test-btn">TEST</button>
+    </div>
+  </div>
+
+  <div class="schedule-box">
+    <div class="label" style="margin-top:0">On shift now (Nookmart)</div>
+    <div id="onShiftNow" class="on-shift-display">— Set schedule below —</div>
+    <details class="schedule-details">
+      <summary class="schedule-summary">Schedule (Mountain)</summary>
+      <div class="schedule-form">
+        <div class="vol-row">
+          <button id="scheduleSave" class="test-btn">Save</button>
+        </div>
+        <label class="label">Paste CSV here (updates above); click Save to remember</label>
+        <textarea id="schedulePaste" placeholder="Paste schedule CSV here"></textarea>
+      </div>
+    </details>
+  </div>
+
+  <div class="label">Current Orders</div>
+  <div class="order-box" id="orderList"></div>
+
+  <div class="label">Recent History</div>
+  <div class="order-box" id="recentList"></div>
+
+  <button id="openHistory" class="btn-nav">VIEW FULL HISTORY / CSV</button>
+  <script src="popup.js"></script>
+</body>
+</html>
