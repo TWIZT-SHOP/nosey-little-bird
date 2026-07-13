@@ -2,19 +2,24 @@
   "manifest_version": 3,
   "name": "Nosey Little Bird! Who Dat? Edition",
   "short_name": "Who Dat? Bird",
-  "version": "1.3",
-  "description": "Tracks unfilled orders on Strobe.gg and HubSpot with audible alerts when orders sit too long. Shows who's on shift (Nookmart) and backup (Overflow) from a pasted schedule (Mountain time). Popup lists live and recent orders with click-to-copy IDs; full history and CSV export/import; volume control and HubSpot HUD for paused orders.",
+  "version": "2.0.0",
+  "description": "Polls Strobe Hub API for unfilled/paused orders, alerts when orders sit past your threat level, shows who's on shift from the coverage schedule.",
   "permissions": [
     "storage",
     "unlimitedStorage",
-    "activeTab",
+    "alarms",
+    "notifications",
+    "offscreen",
     "tabs"
   ],
   "host_permissions": [
+    "https://strobe.gg/*",
+    "https://strobe.twizt.shop/*",
     "https://docs.google.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "action": {
     "default_popup": "popup.html",
@@ -27,17 +32,22 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://*.strobe.gg/*",
-        "https://app.hubspot.com/live-messages/*"
-      ],
+      "matches": ["https://app.hubspot.com/live-messages/*"],
       "js": ["content.js"]
+    },
+    {
+      "matches": [
+        "https://strobe.twizt.shop/*",
+        "https://strobe.gg/*"
+      ],
+      "js": ["schedule-content.js"],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["whistle.mp3", "history.html"],
-      "matches": ["https://*.strobe.gg/*"]
+      "resources": ["whistle.mp3", "history.html", "schedules/latest.csv"],
+      "matches": ["https://*.strobe.gg/*", "https://strobe.twizt.shop/*", "https://app.hubspot.com/*"]
     }
   ]
 }
