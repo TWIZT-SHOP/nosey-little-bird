@@ -14,3 +14,4 @@ work/
 .env.local
 
 .superpowers/
+.worktrees/
