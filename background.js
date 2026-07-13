@@ -49,6 +49,54 @@ async function saveMonitor() {
   await chrome.storage.local.set({ queueMonitorState: memState });
 }
 
+function parseSatSecs(s) {
+  if (!s || typeof s !== "string") return 0;
+  const m =
+    String(s).match(/(\d+)\s*m\s*(\d+)\s*s/i) || String(s).match(/(\d+)/);
+  return m ? (m[2] ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : parseInt(m[1], 10)) : 0;
+}
+
+async function appendHistoryForRemoved(removedIds, prevById, now) {
+  if (!removedIds.length) return;
+  const data = await chrome.storage.local.get({ history: [] });
+  let history = data.history || [];
+  const newEntries = [];
+
+  for (const id of removedIds) {
+    const row = prevById[id];
+    if (!row) continue;
+    const entry = {
+      id,
+      user: row.staff || "??",
+      status: "TAKEN",
+      born: new Date(row.firstSeenAt).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
+      bornDate: new Date(row.firstSeenAt).toLocaleDateString(),
+      taken: new Date(now).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      }),
+      date: new Date(now).toLocaleDateString(),
+      satFor: `${Math.floor((now - row.firstSeenAt) / 60000)}m ${Math.floor(((now - row.firstSeenAt) % 60000) / 1000)}s`,
+      timestamp: now,
+    };
+    const existing = history.find((i) => i.id === id);
+    if (existing && parseSatSecs(entry.satFor) <= parseSatSecs(existing.satFor)) continue;
+    history = history.filter((i) => i.id !== id);
+    newEntries.push(entry);
+  }
+
+  if (newEntries.length) {
+    await chrome.storage.local.set({
+      history: [...newEntries, ...history].slice(0, 5000),
+    });
+  }
+}
+
 async function pollOnce() {
   const now = Date.now();
   if (now < backoffUntil) return;
@@ -73,6 +121,13 @@ async function pollOnce() {
       baseUrl: cfg.strobeApiBase,
       code: "NEW_OR_PENDING",
     });
+
+    const prevById = memState.byId || {};
+    const newIds = new Set(unfilled.map((o) => o.id));
+    const removedIds = Object.keys(prevById).filter((id) => !newIds.has(id));
+    if (removedIds.length) {
+      await appendHistoryForRemoved(removedIds, prevById, now);
+    }
 
     memState = applyQueueSnapshot(memState, unfilled, now);
     const crossing = ordersCrossingThreat(memState, now, cfg.threatLevel);

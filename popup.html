@@ -23,6 +23,7 @@
     .id-text { color: #ff9800; font-weight: bold; }
     .user-text { color: #888; margin-left: 5px; flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .status-tag { font-size: 8px; padding: 2px 4px; border-radius: 3px; font-weight: bold; margin-left: 5px; }
+    .age-text { font-size: 9px; color: #666; margin-left: 5px; white-space: nowrap; }
     .unfilled { background: #e91e63; color: white; }
 
     .schedule-box { background: #222; padding: 10px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #333; }
@@ -49,6 +50,10 @@
       <button id="forcePoll" class="test-btn">Poll now</button>
     </div>
     <div id="pollStatus" class="label" style="margin-top:6px;text-transform:none;color:#888"></div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
+      <input type="checkbox" id="pauseMonitoring" />
+      Pause monitoring
+    </label>
   </div>
 
   <div class="vol-box">

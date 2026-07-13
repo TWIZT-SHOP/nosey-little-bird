@@ -412,6 +412,13 @@ function refreshOnShiftDisplay() {
     });
 }
 
+function formatAgeSec(sec) {
+    if (sec == null || sec < 0) return '';
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}m ${s}s`;
+}
+
 function updateMountainTime() {
     const el = document.getElementById('mountainTime');
     if (!el) return;
@@ -430,7 +437,8 @@ function updateUI() {
     updateMountainTime();
     chrome.storage.local.get({
         currentOrders: [], history: [], pausedOrders: [], mute: false, volume: 0.5, threatLevel: 'high',
-        scheduleCsv: '', scheduleCachedAt: 0, strobeApiKey: '', lastPollOkAt: 0, lastPollError: ''
+        scheduleCsv: '', scheduleCachedAt: 0, strobeApiKey: '', lastPollOkAt: 0, lastPollError: '',
+        monitoringPaused: false
     }, (data) => {
         const btn = document.getElementById('threatToggle');
 
@@ -447,9 +455,19 @@ function updateUI() {
         document.getElementById('volumeSlider').value = data.volume;
 
         const pollEl = document.getElementById('pollStatus');
+        const pauseEl = document.getElementById('pauseMonitoring');
+        if (pauseEl) pauseEl.checked = !!data.monitoringPaused;
         if (pollEl) {
-            if (data.strobeApiKey) {
-                let status = '•••• saved';
+            if (data.monitoringPaused) {
+                pollEl.textContent = data.strobeApiKey
+                    ? 'Paused — API key saved'
+                    : 'Paused — no API key';
+            } else if (data.strobeApiKey) {
+                let status = 'Polling — API key saved';
+                if (data.lastPollOkAt) {
+                    const ago = Math.floor((Date.now() - data.lastPollOkAt) / 1000);
+                    status += ` (${ago < 60 ? `${ago}s ago` : `${Math.floor(ago / 60)}m ago`})`;
+                }
                 if (data.lastPollError) status += ` — ${data.lastPollError}`;
                 pollEl.textContent = status;
             } else {
@@ -462,6 +480,7 @@ function updateUI() {
         <div class="item" data-id="${order.id}">
         <span class="id-text">${order.id}</span>
         <span class="user-text">${order.user || "??"}</span>
+        <span class="age-text">${formatAgeSec(order.ageSec)}</span>
         <span class="status-tag ${order.status.toLowerCase()}">${order.status}</span>
         </div>
         `).join('') || '<div style="padding:10px; color:#444;">No live orders</div>';
@@ -570,6 +589,10 @@ document.getElementById('forcePoll').onclick = () => {
     chrome.runtime.sendMessage({ type: 'FORCE_POLL' }, updateUI);
 };
 
+document.getElementById('pauseMonitoring').onchange = (e) => {
+    chrome.storage.local.set({ monitoringPaused: e.target.checked }, updateUI);
+};
+
 document.getElementById('scheduleSave').onclick = () => {
     const newPaste = document.getElementById('schedulePaste').value.trim();
     chrome.storage.local.get({ scheduleCsv: '' }, (data) => {
@@ -619,7 +642,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     const keys = Object.keys(changes || {});
     if (keys.some(k => [
         "currentOrders", "pausedOrders", "history", "mute", "volume", "threatLevel",
-        "scheduleCsv", "scheduleCachedAt", "strobeApiKey", "lastPollOkAt", "lastPollError"
+        "scheduleCsv", "scheduleCachedAt", "strobeApiKey", "lastPollOkAt", "lastPollError",
+        "monitoringPaused"
     ].includes(k))) {
         updateUI();
         if (keys.some(k => k === "scheduleCsv" || k === "scheduleCachedAt")) refreshOnShiftDisplay();
