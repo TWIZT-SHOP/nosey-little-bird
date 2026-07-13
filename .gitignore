@@ -12,3 +12,5 @@ work/
 *.log
 .env
 .env.local
+
+.superpowers/
