@@ -12,6 +12,9 @@ work/
 *.log
 .env
 .env.local
+*.pem
+*credentials*
+*api*key*
 
 .superpowers/
 .worktrees/

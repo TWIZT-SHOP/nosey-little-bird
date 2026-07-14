@@ -1,23 +1,79 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8" />
   <style>
-    body { width: 260px; padding: 15px; background: #111; color: white; font-family: sans-serif; }
+    body { width: 280px; padding: 12px; background: #111; color: white; font-family: sans-serif; margin: 0; }
+    .top-row { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; }
+    .top-row .status-btn { flex: 1; margin-bottom: 0; }
+    .cog-btn {
+      width: 40px; height: 40px; flex-shrink: 0; border: 1px solid #444; border-radius: 4px;
+      background: #222; color: #ccc; font-size: 18px; cursor: pointer; line-height: 1;
+    }
+    .cog-btn:hover, .cog-btn.active { border-color: #ff9800; color: #ff9800; }
+    #buildBadge {
+      font-size: 9px; font-weight: bold; letter-spacing: 0.5px; color: #888;
+      border: 1px solid #333; border-radius: 3px; padding: 2px 6px; margin-left: 6px;
+    }
+    #buildBadge:not(.hidden) { display: inline-block; }
     .status-btn { width: 100%; padding: 12px; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-bottom: 10px; transition: 0.2s; }
-    /* High Alert is Red (4m), Low Alert is Green (8m) */
     .high { background: #f44; color: white; border: 2px solid #811; }
     .medium { background: #ff9800; color: white; border: 2px solid #a60; }
     .low { background: #4caf50; color: white; border: 2px solid #252; }
     .off { background: #444; color: #aaa; border: 2px solid #222; }
 
-    .vol-box { background: #222; padding: 10px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #333; }
-    .vol-row { display: flex; align-items: center; gap: 10px; margin-top: 5px; }
-    input[type=range] { flex-grow: 1; accent-color: #ff9800; }
+    .prime-meta { margin-bottom: 12px; }
+    .prime-time { font-size: 14px; font-weight: bold; color: #eee; }
+    .prime-duty-row {
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-top: 6px;
+    }
+    .prime-duty-col { min-width: 0; flex: 1; }
+    .prime-duty-col.queue { flex: 0 0 auto; text-align: right; }
+    .prime-duty { font-size: 13px; color: #4caf50; font-weight: bold; min-height: 1.2em; }
+    .prime-duty .muted { color: #666; font-weight: normal; }
+    .on-shift-name { cursor: help; text-decoration: underline; text-decoration-style: dotted; }
+    .queue-count {
+      font-size: 22px; font-weight: bold; color: #eee; line-height: 1.1; min-width: 1.2em;
+    }
+    .queue-count.stale {
+      color: #ff1744;
+      animation: queueFlash 0.7s ease-in-out infinite alternate;
+    }
+    .queue-age {
+      display: block; margin-top: 2px; font-size: 10px; font-weight: normal; color: #888; line-height: 1.2;
+      text-transform: none; letter-spacing: 0;
+    }
+    .queue-count.stale .queue-age {
+      color: #ff8a80;
+      animation: none;
+    }
+    @keyframes queueFlash {
+      from { color: #ff1744; text-shadow: 0 0 0 transparent; opacity: 1; }
+      to { color: #ff8a80; text-shadow: 0 0 10px rgba(255, 23, 68, 0.7); opacity: 0.75; }
+    }
+    .prime-duty-col .label { margin-top: 0; margin-bottom: 2px; }
 
+    .vol-box { background: #222; padding: 10px; border-radius: 4px; margin-bottom: 12px; border: 1px solid #333; }
+    .vol-row { display: flex; align-items: center; gap: 10px; margin-top: 5px; flex-wrap: wrap; }
+    input[type=range] { flex-grow: 1; accent-color: #ff9800; }
     .test-btn { width: auto; padding: 8px; background: #333; color: #ccc; border: 1px solid #444; border-radius: 4px; cursor: pointer; font-size: 11px; font-weight: bold; }
-    .order-box { margin-top: 5px; border: 1px solid #333; border-radius: 4px; background: #000; max-height: 140px; overflow-y: auto; }
-    .btn-nav { width: 100%; padding: 10px; background: #222; border: 1px solid #444; color: #ff9800; font-weight: bold; cursor: pointer; margin-top: 15px; }
-    .label { font-size: 10px; color: #666; text-transform: uppercase; margin-top: 12px; letter-spacing: 0.5px; }
+    .order-box { margin-top: 4px; border: 1px solid #333; border-radius: 4px; background: #000; max-height: 120px; overflow-y: auto; }
+    .btn-nav { width: 100%; padding: 10px; background: #222; border: 1px solid #444; color: #ff9800; font-weight: bold; cursor: pointer; margin-top: 12px; }
+    .label { font-size: 10px; color: #666; text-transform: uppercase; margin-top: 10px; letter-spacing: 0.5px; }
+    .search-box { margin-top: 10px; }
+    .search-row { display: flex; gap: 6px; margin-top: 4px; }
+    .search-row input {
+      flex: 1; min-width: 0; padding: 7px 8px; background: #000; color: #eee;
+      border: 1px solid #444; border-radius: 4px; font-size: 11px; font-family: monospace;
+    }
+    .search-result {
+      margin-top: 6px; padding: 8px; border: 1px solid #333; border-radius: 4px; background: #000;
+      font-size: 11px; min-height: 2.4em; color: #888;
+    }
+    .search-result .who { color: #ff9800; font-weight: bold; }
+    .search-result .stat { color: #4caf50; font-weight: bold; }
+    .search-result .err { color: #f44; }
+    .list-section { margin-top: 0; }
 
     .item { cursor: pointer; padding: 8px; border-bottom: 1px solid #222; font-size: 11px; display: flex; align-items: center; justify-content: space-between; }
     .id-text { color: #ff9800; font-weight: bold; }
@@ -26,69 +82,151 @@
     .age-text { font-size: 9px; color: #666; margin-left: 5px; white-space: nowrap; }
     .unfilled { background: #e91e63; color: white; }
 
-    .schedule-box { background: #222; padding: 10px; border-radius: 4px; margin-bottom: 15px; border: 1px solid #333; }
-    .on-shift-display { font-size: 12px; color: #4caf50; font-weight: bold; margin-top: 4px; min-height: 1.2em; }
-    .on-shift-name { cursor: help; text-decoration: underline; text-decoration-style: dotted; }
-    .schedule-details { margin-top: 8px; font-size: 11px; }
-    .schedule-summary { cursor: pointer; color: #ff9800; }
-    .schedule-form { margin-top: 8px; }
     .schedule-form textarea { width: 100%; min-height: 60px; padding: 6px; background: #111; color: #eee; border: 1px solid #444; border-radius: 4px; margin-top: 4px; font-size: 10px; box-sizing: border-box; }
+    .hidden { display: none !important; }
+    .settings-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .settings-head h2 { margin: 0; font-size: 14px; color: #ff9800; }
+    .back-btn { background: transparent; border: 1px solid #444; color: #ccc; border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 11px; }
   </style>
 </head>
 <body>
-  <button id="threatToggle" class="status-btn high">BIRD ALERT: HIGH (4m)</button>
-
-  <div class="label" style="margin-top:0; margin-bottom:4px;">Current time (Mountain)</div>
-  <div id="mountainTime" class="mountain-time" style="font-size:13px; font-weight:bold; color:#888; margin-bottom:15px;"></div>
-
-  <div class="vol-box" id="apiKeyBox">
-    <div class="label" style="margin-top:0">Strobe Hub API key</div>
-    <input id="apiKeyInput" type="password" placeholder="Paste API key" style="width:100%;box-sizing:border-box;padding:6px;background:#111;color:#eee;border:1px solid #444;border-radius:4px;margin-top:4px" />
-    <div class="vol-row" style="margin-top:8px">
-      <button id="apiKeySave" class="test-btn">Save</button>
-      <button id="apiKeyClear" class="test-btn">Clear</button>
-      <button id="forcePoll" class="test-btn">Poll now</button>
+  <div id="mainView">
+    <div class="top-row">
+      <button id="threatToggle" class="status-btn high">BIRD ALERT: HIGH (4m)</button>
+      <button id="openSettings" class="cog-btn" title="Settings" aria-label="Settings">⚙</button>
     </div>
-    <div id="pollStatus" class="label" style="margin-top:6px;text-transform:none;color:#888"></div>
-    <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
-      <input type="checkbox" id="pauseMonitoring" />
-      Pause monitoring
-    </label>
+
+    <div class="prime-meta">
+      <div id="localTime" class="prime-time">-</div>
+      <div class="prime-duty-row">
+        <div class="prime-duty-col">
+          <div class="label">On Duty</div>
+          <div id="onShiftNow" class="prime-duty"><span class="muted">-</span></div>
+        </div>
+        <div class="prime-duty-col queue">
+          <div class="label">Orders in Queue</div>
+          <div id="queueCount" class="queue-count">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div id="popupSearchSection" class="search-box">
+      <div class="label" style="margin-top:0">Lookup order</div>
+      <div class="search-row">
+        <input id="orderSearch" type="text" placeholder="Paste order ID" autocomplete="off" spellcheck="false" />
+        <button id="orderSearchBtn" class="test-btn" type="button">GO</button>
+      </div>
+      <div id="orderSearchResult" class="search-result">Who + status appear here</div>
+    </div>
+
+    <div id="pendingSection" class="list-section">
+      <div class="label">Pending</div>
+      <div class="order-box" id="orderList"></div>
+    </div>
+
+    <div id="pausedSection" class="list-section">
+      <div class="label">Paused</div>
+      <div class="order-box" id="pausedList"></div>
+    </div>
+
+    <div id="previousSection" class="list-section">
+      <div class="label">Previous</div>
+      <div class="order-box" id="recentList"></div>
+    </div>
+
+    <button id="openHistory" class="btn-nav">FULL HISTORY</button>
   </div>
 
-  <div class="vol-box">
-    <div class="label" style="margin-top:0">Alarm Volume</div>
-    <div class="vol-row">
-      <input type="range" id="volumeSlider" min="0" max="2" step="0.05" title="0–200%">
-      <button id="testAlarm" class="test-btn">TEST</button>
+  <div id="settingsView" class="hidden">
+    <div class="settings-head">
+      <h2>Settings <span id="buildBadge" class="hidden">DEV</span></h2>
+      <button id="closeSettings" class="back-btn" type="button">Back</button>
     </div>
-  </div>
 
-  <div class="schedule-box">
-    <div class="label" style="margin-top:0">On shift now (Nookmart)</div>
-    <div id="onShiftNow" class="on-shift-display">— Set schedule below —</div>
-    <details class="schedule-details">
-      <summary class="schedule-summary">Schedule (Mountain)</summary>
+    <div class="vol-box" id="apiKeyBox">
+      <div class="label" style="margin-top:0">Strobe Hub API key</div>
+      <input id="apiKeyInput" type="password" placeholder="Paste key (strb_… or bare hex)" style="width:100%;box-sizing:border-box;padding:6px;background:#111;color:#eee;border:1px solid #444;border-radius:4px;margin-top:4px" />
+      <div class="vol-row" style="margin-top:8px">
+        <button id="apiKeySave" class="test-btn">Save</button>
+        <button id="apiKeyClear" class="test-btn">Clear</button>
+        <button id="forcePoll" class="test-btn">Poll now</button>
+      </div>
+      <div id="pollStatus" class="label" style="margin-top:6px;text-transform:none;color:#888"></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
+        <input type="checkbox" id="pauseMonitoring" />
+        Pause monitoring
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
+        <input type="checkbox" id="hubspotDarkMode" checked />
+        HubSpot dark mode
+      </label>
+    </div>
+
+    <div class="vol-box">
+      <div class="label" style="margin-top:0">Order lookup</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
+        <input type="checkbox" id="showPopupSearch" />
+        Show search in popup
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
+        <input type="checkbox" id="showHudSearch" checked />
+        Show search on HubSpot HUD
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
+        <input type="checkbox" id="showHudPaused" />
+        Show paused list on HubSpot HUD
+      </label>
+      <p style="font-size:10px;color:#666;margin:8px 0 0;line-height:1.35">
+        Pause monitoring only stops queue alerts - lookup still works either way.
+      </p>
+    </div>
+
+    <div class="vol-box">
+      <div class="label" style="margin-top:0">Popup lists</div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
+        <input type="checkbox" id="showPendingList" />
+        Show Pending
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
+        <input type="checkbox" id="showPausedList" />
+        Show Paused
+      </label>
+      <label id="showPreviousListRow" style="display:flex;align-items:center;gap:6px;font-size:11px;margin-top:8px;color:#aaa;cursor:pointer">
+        <input type="checkbox" id="showPreviousList" />
+        Show Previous
+      </label>
+    </div>
+
+    <div class="vol-box">
+      <div class="label" style="margin-top:0">Alert Sound</div>
+      <div class="vol-row" style="margin-top:6px">
+        <select id="alertSoundSelect" style="flex:1;min-width:0;padding:6px 8px;background:#111;color:#eee;border:1px solid #444;border-radius:4px;font-size:11px"></select>
+        <button id="testAlarm" class="test-btn" type="button">TEST</button>
+      </div>
+      <div id="customSoundRow" class="vol-row hidden" style="margin-top:8px">
+        <input type="file" id="customSoundFile" accept="audio/*,.mp3,.wav,.ogg,.m4a" style="flex:1;min-width:0;font-size:10px;color:#aaa" />
+      </div>
+      <div id="customSoundStatus" class="label" style="margin-top:4px;text-transform:none;color:#666"></div>
+      <div class="label" style="margin-top:10px">Alarm Volume</div>
+      <div class="vol-row">
+        <input type="range" id="volumeSlider" min="0" max="2" step="0.05" title="0-200%" style="flex:1">
+      </div>
+    </div>
+
+    <div class="vol-box">
+      <div class="label" style="margin-top:0">Schedule</div>
+      <p style="font-size:11px;color:#888;margin:6px 0 8px;line-height:1.35">
+        Open <strong style="color:#ccc">strobe.twizt.shop</strong> once after login to refresh, or paste CSV below.
+      </p>
       <div class="schedule-form">
         <div class="vol-row">
           <button id="scheduleSave" class="test-btn">Save</button>
         </div>
-        <label class="label">Paste CSV here (updates above); click Save to remember</label>
         <textarea id="schedulePaste" placeholder="Paste schedule CSV here"></textarea>
       </div>
-    </details>
+    </div>
   </div>
 
-  <div class="label">Current Orders</div>
-  <div class="order-box" id="orderList"></div>
-
-  <div class="label">Paused (API)</div>
-  <div class="order-box" id="pausedList"></div>
-
-  <div class="label">Recent History</div>
-  <div class="order-box" id="recentList"></div>
-
-  <button id="openHistory" class="btn-nav">VIEW FULL HISTORY / CSV</button>
-  <script src="popup.js"></script>
+  <script type="module" src="popup.js"></script>
 </body>
 </html>

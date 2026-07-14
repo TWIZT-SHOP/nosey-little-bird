@@ -8,8 +8,8 @@ export function scheduleJsonToCsv(data) {
       const d = dates[i];
       const shifts = columns[i] || [];
       const iso = d.iso || "";
-      const [y, m, day] = iso.split("-").map(Number);
-      const dateStr = iso ? `${m}/${day}/${String(y).slice(-2)}` : d.label || "";
+      // ISO date avoids M/D vs D/M ambiguity in parsers
+      const dateStr = iso || d.label || "";
       const dayName = iso
         ? new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", {
             weekday: "short",

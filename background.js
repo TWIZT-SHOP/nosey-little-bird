@@ -1,10 +1,12 @@
-import { pullOrders, DEFAULT_BASE } from "./strobe-api.js";
+import { pullOrders, searchOrders, zeroOhVariants, normalizeApiKey, DEFAULT_BASE } from "./strobe-api.js";
 import {
   applyQueueSnapshot,
   ordersCrossingThreat,
   markWhistled,
 } from "./queue-monitor.js";
 import { scheduleJsonToCsv } from "./schedule-from-json.js";
+import { resolveAlertSrc, DEFAULT_ALERT_SOUND } from "./alert-sounds.js";
+import { FEATURES } from "./build-profile.js";
 
 const ALARM = "bird-poll";
 
@@ -21,16 +23,30 @@ async function ensureOffscreen() {
     await chrome.offscreen.createDocument({
       url: "offscreen.html",
       reasons: ["AUDIO_PLAYBACK"],
-      justification: "Play Bird Alert whistle when orders age past threat",
+      justification: "Play Bird Alert sound when orders age past threat",
     });
   } catch (_) {
     /* already exists */
   }
 }
 
-async function playWhistle(volume) {
+async function playAlertSound(volume) {
   await ensureOffscreen();
-  return chrome.runtime.sendMessage({ type: "PLAY_WHISTLE", volume });
+  const cfg = await chrome.storage.local.get({
+    alertSoundId: DEFAULT_ALERT_SOUND,
+    alertSoundCustom: "",
+  });
+  const src = resolveAlertSrc(cfg.alertSoundId, cfg.alertSoundCustom);
+  return chrome.runtime.sendMessage({
+    type: "PLAY_ALERT",
+    volume,
+    src,
+  });
+}
+
+/** @deprecated name kept for older call sites */
+async function playWhistle(volume) {
+  return playAlertSound(volume);
 }
 
 function setBadge(text, color = "#e91e63") {
@@ -57,7 +73,8 @@ function parseSatSecs(s) {
 }
 
 async function appendHistoryForRemoved(removedIds, prevById, now) {
-  if (!removedIds.length) return;
+  if (!FEATURES.birdBrain || !removedIds.length) return;
+  const max = FEATURES.historyMaxEntries || 2000;
   const data = await chrome.storage.local.get({ history: [] });
   let history = data.history || [];
   const newEntries = [];
@@ -69,6 +86,7 @@ async function appendHistoryForRemoved(removedIds, prevById, now) {
       id,
       user: row.staff || "??",
       status: "TAKEN",
+      source: "poll",
       born: new Date(row.firstSeenAt).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",
@@ -92,9 +110,46 @@ async function appendHistoryForRemoved(removedIds, prevById, now) {
 
   if (newEntries.length) {
     await chrome.storage.local.set({
-      history: [...newEntries, ...history].slice(0, 5000),
+      history: [...newEntries, ...history].slice(0, max),
     });
   }
+}
+
+/** Log a Hub lookup / HUD GO into Bird Brain (history). Dev only. */
+async function recordHistorySight(sight) {
+  if (!FEATURES.birdBrain) return { ok: true, skipped: true };
+  const id = String(sight?.id || "").trim().toUpperCase();
+  if (!id) return { ok: false, error: "missing id" };
+  const now = Date.now();
+  const max = FEATURES.historyMaxEntries || 2000;
+  const data = await chrome.storage.local.get({ history: [] });
+  let history = (data.history || []).filter((i) => String(i.id || "").toUpperCase() !== id);
+
+  const placedMs = sight.createdAtMs && Number.isFinite(sight.createdAtMs) ? sight.createdAtMs : null;
+  const entry = {
+    id,
+    user: sight.user || sight.staff || "??",
+    status: sight.status || "??",
+    source: sight.source || "lookup",
+    born: placedMs
+      ? new Date(placedMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : "—",
+    bornDate: placedMs ? new Date(placedMs).toLocaleDateString() : "",
+    taken: new Date(now).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }),
+    date: new Date(now).toLocaleDateString(),
+    satFor: "—",
+    note: sight.note || "",
+    timestamp: now,
+  };
+
+  await chrome.storage.local.set({
+    history: [entry, ...history].slice(0, max),
+  });
+  return { ok: true, entry };
 }
 
 async function pollOnce() {
@@ -110,7 +165,17 @@ async function pollOnce() {
     monitoringPaused: false,
   });
 
-  if (!cfg.strobeApiKey || cfg.monitoringPaused) {
+  const healedKey = normalizeApiKey(cfg.strobeApiKey);
+  if (healedKey && healedKey !== String(cfg.strobeApiKey || "").trim()) {
+    cfg.strobeApiKey = healedKey;
+    chrome.storage.local.set({ strobeApiKey: healedKey }).catch(() => {});
+  }
+
+  if (cfg.monitoringPaused) {
+    setBadge("");
+    return;
+  }
+  if (!cfg.strobeApiKey) {
     setBadge("!", "#f44");
     return;
   }
@@ -137,7 +202,7 @@ async function pollOnce() {
           type: "basic",
           iconUrl: "icon.png",
           title: "Order past threat marker",
-          message: `${id} sitting too long — queue may need help`,
+          message: `${id} sitting too long - queue may need help`,
           priority: 2,
           requireInteraction: true,
         });
@@ -190,6 +255,9 @@ async function pollOnce() {
 chrome.runtime.onInstalled.addListener(async () => {
   await loadPersistedMonitor();
   chrome.alarms.create(ALARM, { periodInMinutes: 1 });
+  if (!FEATURES.birdBrain) {
+    chrome.storage.local.remove(["history", "birdBrainLog", "alertSoundCustom"]);
+  }
   pollOnce();
 });
 
@@ -204,8 +272,30 @@ chrome.alarms.onAlarm.addListener((a) => {
 });
 
 chrome.runtime.onMessage.addListener((msg, _s, sendResponse) => {
+  if (msg?.type === "PING") {
+    sendResponse({ ok: true });
+    return false;
+  }
   if (msg?.type === "FORCE_POLL") {
     pollOnce().then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg?.type === "SEARCH_ORDER") {
+    handleSearchQuery(msg.query)
+      .then(async (r) => {
+        if (r?.ok && r.order?.id) {
+          await recordHistorySight({
+            id: r.order.id,
+            user: r.order.staff,
+            status: r.order.status,
+            createdAtMs: r.order.createdAtMs,
+            note: r.order.note,
+            source: "lookup",
+          });
+        }
+        sendResponse(r);
+      })
+      .catch((e) => sendResponse({ ok: false, error: String(e?.message || e) }));
     return true;
   }
   if (msg?.type === "SCHEDULE_JSON") {
@@ -225,6 +315,112 @@ chrome.runtime.onMessage.addListener((msg, _s, sendResponse) => {
     }).then(() => sendResponse({ ok: true }));
     return true;
   }
+});
+
+async function handleSearchQuery(query) {
+  const cleaned = String(query || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
+  if (!cleaned) return { ok: false, error: "Paste full order ID" };
+
+  const cfg = await chrome.storage.local.get({
+    strobeApiKey: "",
+    strobeApiBase: DEFAULT_BASE,
+  });
+  const apiKey = normalizeApiKey(cfg.strobeApiKey);
+  const baseUrl = String(cfg.strobeApiBase || DEFAULT_BASE).trim() || DEFAULT_BASE;
+  if (!apiKey) return { ok: false, error: "No API key - save one in bird settings" };
+
+  // Heal keys that were saved with a leading "Bearer "
+  if (apiKey !== String(cfg.strobeApiKey || "").trim()) {
+    chrome.storage.local.set({ strobeApiKey: apiKey }).catch(() => {});
+  }
+
+  const variants = zeroOhVariants(cleaned);
+  let lastErr = null;
+  for (const v of variants) {
+    try {
+      const orders = await searchOrders({
+        apiKey,
+        baseUrl,
+        query: v,
+      });
+      const q = v.toUpperCase();
+      const hit =
+        orders.find((o) => String(o.id || "").toUpperCase() === q) ||
+        orders[0] ||
+        null;
+      if (hit) {
+        return {
+          ok: true,
+          order: {
+            id: hit.id,
+            staff: hit.staff || "??",
+            status: hit.status || "??",
+            createdAtMs: hit.createdAtMs || null,
+            note: hit.note || "",
+          },
+          count: orders.length,
+          queryUsed: v,
+          corrected: v !== cleaned,
+        };
+      }
+    } catch (e) {
+      lastErr = e;
+      // Network / auth failure - don't burn through all O/0 variants
+      if (
+        e?.code === "NETWORK" ||
+        e?.code === "API_AUTH" ||
+        /Failed to fetch|Network|auth/i.test(String(e?.message || e))
+      ) {
+        return { ok: false, error: String(e?.message || e) };
+      }
+    }
+  }
+
+  if (lastErr) return { ok: false, error: String(lastErr?.message || lastErr) };
+  return { ok: true, order: null, count: 0 };
+}
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== "bird-search") return;
+  port.onMessage.addListener(async (msg) => {
+    if (msg?.type !== "SEARCH_ORDER") return;
+    try {
+      port.postMessage(await handleSearchQuery(msg.query));
+    } catch (e) {
+      port.postMessage({ ok: false, error: String(e?.message || e) });
+    }
+  });
+});
+
+// Storage relay - survives flaky sendMessage ports (Brave SW sleep)
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "local") return;
+  if (Object.prototype.hasOwnProperty.call(changes, "monitoringPaused")) {
+    if (changes.monitoringPaused?.newValue) setBadge("");
+    else pollOnce().catch(() => {});
+  }
+  if (!changes.birdSearchRequest?.newValue) return;
+  const req = changes.birdSearchRequest.newValue;
+  if (!req?.id || !req?.query) return;
+  handleSearchQuery(req.query)
+    .then((result) =>
+      chrome.storage.local.set({
+        birdSearchResult: { id: req.id, at: Date.now(), ...result },
+      })
+    )
+    .catch((e) =>
+      chrome.storage.local.set({
+        birdSearchResult: {
+          id: req.id,
+          at: Date.now(),
+          ok: false,
+          error: String(e?.message || e),
+        },
+      })
+    );
 });
 
 // Ensure alarm exists when SW wakes without install/startup events

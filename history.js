@@ -13,43 +13,87 @@ document.getElementById('userFilter').addEventListener('change', (e) => {
 });
 
 function parseToSeconds(str) {
-    if (!str || str.includes("---") || str.includes("LIVE")) return 0;
+    if (!str || str.includes("---") || str.includes("LIVE") || str === "—") return 0;
     const parts = str.match(/\d+/g);
     if (!parts) return 0;
     return parts.length === 2 ? (parseInt(parts[0]) * 60) + parseInt(parts[1]) : parseInt(parts[0]);
 }
 
 function updateStats(data) {
-    const valid = data.filter(i => parseToSeconds(i.satFor) > 0);
-    const totalSecs = valid.reduce((acc, i) => acc + parseToSeconds(i.satFor), 0);
-    const avg = valid.length ? Math.round(totalSecs / valid.length) : 0;
     const counts = {};
     data.filter(i => i.user && i.user !== "??").forEach(i => counts[i.user] = (counts[i.user] || 0) + 1);
     const top = Object.keys(counts).reduce((a, b) => counts[a] > counts[b] ? a : b, "---");
-
-    document.getElementById("stat-avg").innerText = `${Math.floor(avg/60)}m ${avg%60}s`;
     document.getElementById("stat-count").innerText = data.length;
     document.getElementById("stat-top").innerText = top;
 }
 
+function howLabel(item) {
+    const src = String(item.source || '').toLowerCase();
+    if (src === 'lookup') return 'lookup';
+    if (src === 'poll' || item.status === 'TAKEN') return 'queue';
+    if (item.satFor && parseToSeconds(item.satFor) > 0) return 'queue';
+    return item.source || 'seen';
+}
+
+function seenLabel(item) {
+    const t = item.timestamp ? new Date(item.timestamp) : null;
+    if (t && !Number.isNaN(t.getTime())) {
+        return t.toLocaleString([], { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    }
+    const dateStr = item.date || item.bornDate || '';
+    const timeStr = item.taken || item.born || '';
+    return [dateStr, timeStr].filter(Boolean).join(' ') || '—';
+}
+
 function load() {
-    chrome.storage.local.get({history: []}, (data) => {
+    chrome.storage.local.get({ history: [], birdBrainLog: [] }, (data) => {
+        // One-time heal: HUD used to write birdBrainLog; Bird Brain page reads history
+        let history = data.history || [];
+        const orphan = data.birdBrainLog || [];
+        if (orphan.length && history.length === 0) {
+            const now = Date.now();
+            history = orphan.map((e, i) => ({
+                id: e.id,
+                user: e.staff || e.user || "??",
+                status: e.status || e.note || "??",
+                source: "lookup",
+                born: "—",
+                bornDate: "",
+                taken: "",
+                date: "",
+                satFor: "—",
+                note: e.note || "",
+                timestamp: e.at || now - i,
+            }));
+            chrome.storage.local.set({ history, birdBrainLog: [] });
+        }
+
         const table = document.getElementById("tableBody");
-        const byTimestamp = [...data.history].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        const byTimestamp = [...history].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
         const byId = new Map();
         byTimestamp.forEach(item => {
             const existing = byId.get(item.id);
-            const itemSecs = parseToSeconds(item.satFor);
-            const existingSecs = existing ? parseToSeconds(existing.satFor) : -1;
-            if (!existing || itemSecs > existingSecs) byId.set(item.id, item);
+            if (!existing) {
+                byId.set(item.id, item);
+                return;
+            }
+            const itemSat = parseToSeconds(item.satFor);
+            const existingSat = parseToSeconds(existing.satFor);
+            if ((item.timestamp || 0) >= (existing.timestamp || 0)) {
+                byId.set(item.id, {
+                    ...existing,
+                    ...item,
+                    satFor: itemSat > existingSat ? item.satFor : existing.satFor,
+                });
+            }
         });
         const deduped = [...byId.values()].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        if (deduped.length < data.history.length) {
+        if (deduped.length < history.length) {
             chrome.storage.local.set({ history: deduped });
         }
         const sorted = deduped;
 
-        const users = [...new Set(data.history.map(i => isUnknownUser(i.user) ? '__unknown__' : i.user))];
+        const users = [...new Set(history.map(i => isUnknownUser(i.user) ? '__unknown__' : i.user))];
         users.sort((a, b) => {
             if (a === '__unknown__') return -1;
             if (b === '__unknown__') return 1;
@@ -76,16 +120,14 @@ function load() {
         table.innerHTML = "";
         filtered.slice((currentPage-1)*perPage, currentPage*perPage).forEach(item => {
             const row = table.insertRow();
-            const dateStr = item.date || item.bornDate || '';
-            const bornGone = dateStr ? `${dateStr} ${item.born} <span style="color:#444;">>></span> ${item.taken}` : `${item.born} <span style="color:#444;">>></span> ${item.taken}`;
             const rowKey = entryKey(item);
             row.innerHTML = `
             <td><input type="checkbox" class="row-check" data-id="${item.id}" data-ts="${rowKey}"></td>
             <td class="id-text" data-id="${item.id}">${item.id}</td>
-            <td style="color:#ff9800;">${item.user}</td>
-            <td style="font-size:10px; font-weight:bold; opacity:0.8;">${item.status}</td>
-            <td style="color:#888;">${bornGone}</td>
-            <td style="color:#444;">—</td>
+            <td style="color:#ff9800;">${item.user || '??'}</td>
+            <td style="font-size:10px; font-weight:bold; opacity:0.8;">${item.status || '??'}</td>
+            <td style="color:#888;">${seenLabel(item)}</td>
+            <td style="color:#666;font-size:11px;">${howLabel(item)}</td>
             <td><button class="del-btn" data-id="${item.id}" data-ts="${rowKey}">X</button></td>
             `;
         });
@@ -96,13 +138,12 @@ function entryKey(item) {
     return item.timestamp != null ? String(item.timestamp) : `${item.id}-${item.taken}`;
 }
 
-// --- CSV LORE EXPORT ---
 document.getElementById("downloadCsv").onclick = () => {
     chrome.storage.local.get({history: []}, (data) => {
-        let csv = "Order ID,Staff,Status,Date,Born,Gone,Sat For\n";
+        let csv = "Order ID,Staff,Status,Seen,How,Placed,Sat For\n";
         data.history.forEach(i => {
             const d = i.date || i.bornDate || '';
-            csv += `${i.id},${i.user},${i.status},${d},${i.born},${i.taken},${i.satFor}\n`;
+            csv += `${i.id},${i.user},${i.status},${seenLabel(i)},${howLabel(i)},${d} ${i.born || ''},${i.satFor || ''}\n`;
         });
         const blob = new Blob([csv], {type: 'text/csv'});
         const a = document.createElement('a');
@@ -112,7 +153,6 @@ document.getElementById("downloadCsv").onclick = () => {
     });
 };
 
-// --- ABSORB LORE (MERGE) ---
 document.getElementById("mergeBtn").onclick = () => document.getElementById("importCsv").click();
 document.getElementById("importCsv").onchange = (e) => {
     const file = e.target.files[0];
@@ -133,7 +173,7 @@ document.getElementById("importCsv").onchange = (e) => {
                 const key = `${id}-${status}-${date}`;
                 if (!existingKeys.has(key)) {
                     existingKeys.add(key);
-                    newEntries.push({ id, user, status, born, taken, satFor, date, bornDate: date, timestamp: Date.now() - i });
+                    newEntries.push({ id, user, status, born, taken, satFor, date, bornDate: date, source: 'import', timestamp: Date.now() - i });
                 }
             });
             if (newEntries.length) {
@@ -141,9 +181,7 @@ document.getElementById("importCsv").onchange = (e) => {
                 const byId = new Map();
                 merged.forEach(item => {
                     const existing = byId.get(item.id);
-                    const itemSecs = parseToSeconds(item.satFor);
-                    const existingSecs = existing ? parseToSeconds(existing.satFor) : -1;
-                    if (!existing || itemSecs > existingSecs) byId.set(item.id, item);
+                    if (!existing || (item.timestamp || 0) >= (existing.timestamp || 0)) byId.set(item.id, item);
                 });
                 const deduped = [...byId.values()];
                 chrome.storage.local.set({history: deduped}, () => {
@@ -156,7 +194,6 @@ document.getElementById("importCsv").onchange = (e) => {
     reader.readAsText(file);
 };
 
-// --- UI HELPERS ---
 document.getElementById("selectAll").onclick = (e) => {
     document.querySelectorAll(".row-check").forEach(cb => cb.checked = e.target.checked);
 };

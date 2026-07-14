@@ -27,6 +27,8 @@ const sample = {
 const csv = scheduleJsonToCsv(sample);
 assert.match(csv, /Nookmart/);
 assert.match(csv, /chAos/);
+assert.match(csv, /2026-07-13/);
+assert.doesNotMatch(csv, /7\/13\/26/);
 
 const at = Date.parse("2026-07-13T15:00:00-07:00");
 const names = namesOnDutyAt(sample, at);
