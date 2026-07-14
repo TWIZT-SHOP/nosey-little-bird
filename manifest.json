@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Nosey Little Bird! Who Dat? Edition",
   "short_name": "Who Dat? Bird",
-  "version": "2.2.1",
+  "version": "2.2.2",
   "description": "Polls Strobe Hub API for unfilled/paused orders, alerts when orders sit past your threat level, shows who's on shift from the coverage schedule.",
   "permissions": [
     "storage",

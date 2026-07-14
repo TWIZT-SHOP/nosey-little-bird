@@ -1,4 +1,4 @@
-import { pullOrders, searchOrders, zeroOhVariants, normalizeApiKey, DEFAULT_BASE } from "./strobe-api.js";
+import { pullOrders, searchOrders, zeroOhVariants, normalizeApiKey, DEFAULT_BASE, LONG_WAIT_SECONDS, isWaitingQueueStatus } from "./strobe-api.js";
 import {
   applyQueueSnapshot,
   ordersCrossingThreat,
@@ -8,7 +8,6 @@ import {
 import { scheduleJsonToCsv } from "./schedule-from-json.js";
 import { resolveAlertSrc, DEFAULT_ALERT_SOUND } from "./alert-sounds.js";
 import { FEATURES } from "./build-profile.js";
-import { LONG_WAIT_SECONDS } from "./strobe-api.js";
 
 const ALARM = "bird-poll";
 
@@ -231,20 +230,22 @@ async function pollOnce() {
   }
 
   try {
-    const unfilled = await pullOrders({
+    const pulled = await pullOrders({
       apiKey: cfg.strobeApiKey,
       baseUrl: cfg.strobeApiBase,
       code: "NEW_OR_PENDING",
     });
+    // Alerts / badge / age tracking = waiting queue only (not PENDING mid-order).
+    const waiting = pulled.filter((o) => isWaitingQueueStatus(o.status));
 
     const prevById = memState.byId || {};
-    const newIds = new Set(unfilled.map((o) => o.id));
+    const newIds = new Set(waiting.map((o) => o.id));
     const removedIds = Object.keys(prevById).filter((id) => !newIds.has(id));
     if (removedIds.length) {
       await appendHistoryForRemoved(removedIds, prevById, now);
     }
 
-    memState = applyQueueSnapshot(memState, unfilled, now);
+    memState = applyQueueSnapshot(memState, waiting, now);
     const threat = cfg.mute ? "off" : cfg.threatLevel;
     const crossing = ordersCrossingThreat(memState, now, threat);
     if (crossing.length && threat !== "off") {
@@ -266,20 +267,24 @@ async function pollOnce() {
     }
 
     await chrome.storage.local.set({
-      currentOrders: unfilled.map((o) => ({
-        id: o.id,
-        user: memState.byId[o.id]?.staff || o.staff || "??",
-        status: o.status || "UNFILLED",
-        ageSec: Math.floor((now - (memState.byId[o.id]?.firstSeenAt || now)) / 1000),
-      })),
+      currentOrders: pulled.map((o) => {
+        const row = memState.byId[o.id];
+        const firstSeen = row?.firstSeenAt || now;
+        return {
+          id: o.id,
+          user: row?.staff || o.staff || "??",
+          status: o.status || "UNFILLED",
+          ageSec: Math.floor((now - firstSeen) / 1000),
+        };
+      }),
       lastPollOkAt: now,
       lastPollError: "",
     });
 
     const longWait = queueHasLongWait(memState, now, LONG_WAIT_SECONDS);
     const badgeColor = longWait ? "#ff1744" : "#e91e63";
-    setBadge(String(unfilled.length), badgeColor);
-    await setIconFlash(longWait && unfilled.length > 0);
+    setBadge(String(waiting.length), badgeColor);
+    await setIconFlash(longWait && waiting.length > 0);
 
     pollTick += 1;
     if (pollTick % 2 === 0) {

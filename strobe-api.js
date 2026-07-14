@@ -4,6 +4,19 @@ export const THREAT_SECONDS = { high: 240, medium: 360, low: 480, one: 0 };
 export const LONG_WAIT_SECONDS = 900; // 15 minutes
 export const DEFAULT_BASE = "https://strobe.gg";
 
+/** True when Hub status still means “needs a taker” (alert on these, not PENDING). */
+export function isWaitingQueueStatus(status) {
+  const s = String(status || "")
+    .trim()
+    .toUpperCase();
+  if (!s) return true;
+  if (s === "PENDING" || s === "PAUSED" || s === "COMPLETE" || s === "COMPLETED") {
+    return false;
+  }
+  // UNFILLED / NEW / OPEN / anything else still in the pull → treat as waiting
+  return true;
+}
+
 /** Strip accidental "Bearer " / normalize Hub keys (often need strb_ prefix). */
 export function normalizeApiKey(key) {
   let k = String(key || "").trim();

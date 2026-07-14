@@ -603,7 +603,7 @@ function updateUI() {
     applyBuildUi();
     chrome.storage.local.get({
         currentOrders: [], history: [], pausedOrders: [], mute: false, volume: 0.5, threatLevel: 'high',
-        scheduleCsv: '', scheduleJson: null, scheduleCachedAt: 0, strobeApiKey: '', lastPollOkAt: 0, lastPollError: '',
+        scheduleCsv: '', scheduleJson: null, scheduleCachedAt: 0, scheduleCacheError: '', strobeApiKey: '', lastPollOkAt: 0, lastPollError: '',
         monitoringPaused: false, hubspotDarkMode: true,
         showPendingList: false, showPausedList: false, showPreviousList: false,
         showHudPaused: false, showPopupSearch: false, showHudSearch: true,
@@ -635,6 +635,22 @@ function updateUI() {
         document.getElementById('volumeSlider').value = data.volume;
         fillAlertSoundSelect(data.alertSoundId || DEFAULT_ALERT_SOUND);
         syncCustomSoundStatus(!!data.alertSoundCustom);
+
+        const schedStatus = document.getElementById('scheduleStatus');
+        if (schedStatus) {
+            if (data.scheduleCachedAt) {
+                const ago = Math.floor((Date.now() - data.scheduleCachedAt) / 1000);
+                const when = ago < 60 ? `${ago}s ago` : ago < 3600 ? `${Math.floor(ago / 60)}m ago` : `${Math.floor(ago / 3600)}h ago`;
+                schedStatus.style.color = '#4caf50';
+                schedStatus.textContent = `Schedule loaded (${when})`;
+            } else if (data.scheduleCacheError) {
+                schedStatus.style.color = '#f44';
+                schedStatus.textContent = `Schedule not loaded — ${data.scheduleCacheError}`;
+            } else {
+                schedStatus.style.color = '#888';
+                schedStatus.textContent = 'Schedule not loaded yet — open strobe.twizt.shop';
+            }
+        }
 
         const pollEl = document.getElementById('pollStatus');
         const pauseEl = document.getElementById('pauseMonitoring');
@@ -1136,7 +1152,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     const keys = Object.keys(changes || {});
     if (keys.some(k => [
         "currentOrders", "pausedOrders", "history", "mute", "volume", "threatLevel",
-        "scheduleCsv", "scheduleCachedAt", "strobeApiKey", "lastPollOkAt", "lastPollError",
+        "scheduleCsv", "scheduleCachedAt", "scheduleJson", "scheduleCacheError", "strobeApiKey", "lastPollOkAt", "lastPollError",
         "monitoringPaused", "showPopupSearch"
     ].includes(k))) {
         updateUI();

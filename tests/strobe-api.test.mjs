@@ -5,6 +5,7 @@ import {
   normalizeSearchOrders,
   zeroOhVariants,
   THREAT_SECONDS,
+  isWaitingQueueStatus,
 } from "../strobe-api.js";
 
 const sample = {
@@ -29,6 +30,10 @@ assert.equal(THREAT_SECONDS.high, 240);
 assert.equal(THREAT_SECONDS.medium, 360);
 assert.equal(THREAT_SECONDS.low, 480);
 assert.equal(THREAT_SECONDS.one, 0);
+assert.equal(isWaitingQueueStatus("UNFILLED"), true);
+assert.equal(isWaitingQueueStatus("NEW"), true);
+assert.equal(isWaitingQueueStatus("PENDING"), false);
+assert.equal(isWaitingQueueStatus("PAUSED"), false);
 
 const searched = normalizeSearchOrders({
   success: true,
