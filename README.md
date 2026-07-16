@@ -38,9 +38,10 @@ Get the **latest** build (look for **⚙** next to BIRD ALERT — that’s the c
 1. Click the bird icon → **⚙ Settings**.
 2. Get your personal API key from [Strobe Hub settings](https://strobe.gg/core/settings), paste it → **Save**. Use **your own** key — don’t share it.
 3. Set **BIRD ALERT**: HIGH (4m) / MED (6m) / LOW (8m) / **1 ORDER** (any new unfilled order) / OFF. Click the button to cycle.
-4. (Optional) Pick an alert sound and volume; use **TEST**.
-5. Open the schedule site once while logged in, so who’s-on-shift can update. Or paste schedule CSV under Settings → Schedule → Save.
-6. On HubSpot, turn on the HUD options you want (search, paused list, dark mode).
+4. (Optional) **Queue check speed** — Every ~1 min (default, easy on PC), 30s, or 15s (snappier, more load).
+5. (Optional) Pick an alert sound and volume; use **TEST**.
+6. Open the schedule site once while logged in, so who’s-on-shift can update. Or paste schedule CSV under Settings → Schedule → Save.
+7. On HubSpot, turn on the HUD options you want (search, paused list, dark mode).
 
 **Pause monitoring** stops queue polling and clears the badge. Lookup still works.
 
@@ -77,7 +78,7 @@ Get the **latest** build (look for **⚙** next to BIRD ALERT — that’s the c
 | Permission | Why |
 |------------|-----|
 | Storage | Settings, your API key, schedule cache |
-| Alarms | Background queue check (~every minute) |
+| Alarms / offscreen timer | Background queue check (Settings: ~60s / 30s / 15s) |
 | Notifications / offscreen | Desktop alert + sound |
 | Tabs | Open helper pages |
 | strobe.gg / strobe.twizt.shop | Hub API + schedule |

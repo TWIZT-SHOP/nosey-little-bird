@@ -1,4 +1,5 @@
 let flashTimer = null;
+let pollTimer = null;
 
 function stopFlash() {
   if (flashTimer) {
@@ -7,7 +8,34 @@ function stopFlash() {
   }
 }
 
+function stopPollTimer() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+/** Sub-minute Hub polls — chrome.alarms floor is ~1 min. */
+function setPollCadence(seconds) {
+  stopPollTimer();
+  const sec = Number(seconds);
+  if (!Number.isFinite(sec) || sec < 15 || sec >= 60) return;
+  const ms = Math.round(sec * 1000);
+  pollTimer = setInterval(() => {
+    chrome.runtime.sendMessage({ type: "POLL_TICK" }).catch(() => {
+      stopPollTimer();
+    });
+  }, ms);
+  // First tick soon so cadence change feels immediate
+  chrome.runtime.sendMessage({ type: "POLL_TICK" }).catch(() => {});
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === "SET_POLL_CADENCE") {
+    setPollCadence(msg.seconds);
+    sendResponse({ ok: true });
+    return false;
+  }
   if (msg?.type === "START_ICON_FLASH") {
     stopFlash();
     flashTimer = setInterval(() => {

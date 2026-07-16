@@ -1,5 +1,20 @@
 import { ALERT_SOUNDS, DEFAULT_ALERT_SOUND, resolveAlertSrc } from "./alert-sounds.js";
 import { FEATURES, buildLabel, IS_DEV } from "./build-profile.js";
+import {
+  DEFAULT_POLL_INTERVAL_SEC,
+  POLL_INTERVAL_OPTIONS,
+  normalizePollIntervalSec,
+} from "./poll-cadence.js";
+
+function fillPollIntervalSelect(selectedSec) {
+  const sel = document.getElementById("pollIntervalSelect");
+  if (!sel) return;
+  const cur = normalizePollIntervalSec(selectedSec);
+  sel.innerHTML = POLL_INTERVAL_OPTIONS.map(
+    (o) =>
+      `<option value="${o.sec}"${o.sec === cur ? " selected" : ""}>${o.label}</option>`
+  ).join("");
+}
 
 let testAudio = null;
 let testGainNode = null;
@@ -606,10 +621,12 @@ function updateUI() {
         scheduleCsv: '', scheduleJson: null, scheduleCachedAt: 0, scheduleCacheError: '', strobeApiKey: '', lastPollOkAt: 0, lastPollError: '',
         lastBirdAlertAt: 0, lastBirdAlertIds: [], lastBirdAlertMode: '', lastBirdAlertSoundOk: null, lastBirdAlertSoundError: '',
         monitoringPaused: false, hubspotDarkMode: true,
+        pollIntervalSec: DEFAULT_POLL_INTERVAL_SEC,
         showPendingList: false, showPausedList: false, showPreviousList: false,
         showHudPaused: false, showPopupSearch: false, showHudSearch: true,
         alertSoundId: DEFAULT_ALERT_SOUND, alertSoundCustom: ''
     }, (data) => {
+        fillPollIntervalSelect(data.pollIntervalSec);
         const btn = document.getElementById('threatToggle');
 
         // Maintain your Alert Status logic
@@ -696,15 +713,16 @@ function updateUI() {
         document.getElementById('pausedSection')?.classList.toggle('hidden', !showPaused);
         document.getElementById('previousSection')?.classList.toggle('hidden', !showPrevious);
         if (pollEl) {
+            const every = normalizePollIntervalSec(data.pollIntervalSec);
             if (data.monitoringPaused) {
                 pollEl.textContent = data.strobeApiKey
-                    ? 'Paused - API key saved'
+                    ? `Paused - API key saved (would check every ${every}s)`
                     : 'Paused - no API key';
             } else if (data.strobeApiKey) {
-                let status = 'Polling - API key saved';
+                let status = `Polling every ${every}s`;
                 if (data.lastPollOkAt) {
                     const ago = Math.floor((Date.now() - data.lastPollOkAt) / 1000);
-                    status += ` (${ago < 60 ? `${ago}s ago` : `${Math.floor(ago / 60)}m ago`})`;
+                    status += ` · last ${ago < 60 ? `${ago}s` : `${Math.floor(ago / 60)}m`} ago`;
                 }
                 if (data.lastPollError) status += ` - ${data.lastPollError}`;
                 pollEl.textContent = status;
@@ -929,6 +947,14 @@ document.getElementById('forcePoll').onclick = () => {
 document.getElementById('pauseMonitoring').onchange = (e) => {
     chrome.storage.local.set({ monitoringPaused: e.target.checked }, updateUI);
 };
+
+document.getElementById('pollIntervalSelect')?.addEventListener('change', (e) => {
+    const sec = normalizePollIntervalSec(e.target.value);
+    chrome.storage.local.set({ pollIntervalSec: sec }, () => {
+        chrome.runtime.sendMessage({ type: 'SYNC_POLL_CADENCE' }).catch(() => {});
+        updateUI();
+    });
+});
 
 document.getElementById('hubspotDarkMode')?.addEventListener('change', (e) => {
     chrome.storage.local.set({ hubspotDarkMode: e.target.checked });

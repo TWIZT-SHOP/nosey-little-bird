@@ -9,6 +9,11 @@ import {
 import { scheduleJsonToCsv } from "./schedule-from-json.js";
 import { resolveAlertSrc, DEFAULT_ALERT_SOUND } from "./alert-sounds.js";
 import { FEATURES } from "./build-profile.js";
+import {
+  DEFAULT_POLL_INTERVAL_SEC,
+  normalizePollIntervalSec,
+  pollIntervalNeedsOffscreen,
+} from "./poll-cadence.js";
 
 const ALARM = "bird-poll";
 
@@ -19,6 +24,8 @@ let iconFlashOn = false;
 let iconFlashWanted = false;
 /** Last threatLevel seen — detect switch into 1-ORDER so existing queue can ping once. */
 let lastThreatLevel = null;
+/** Throttle overlapping alarm + offscreen ticks. */
+let lastPollStartedAt = 0;
 
 async function ensureOffscreen() {
   const contexts = await chrome.runtime.getContexts?.({
@@ -29,10 +36,40 @@ async function ensureOffscreen() {
     await chrome.offscreen.createDocument({
       url: "offscreen.html",
       reasons: ["AUDIO_PLAYBACK"],
-      justification: "Play Bird Alert sound when orders age past threat",
+      justification:
+        "Play Bird Alert sound and run optional sub-minute Hub queue poll timer",
     });
   } catch (_) {
     /* already exists */
+  }
+}
+
+async function syncPollCadence() {
+  const data = await chrome.storage.local.get({
+    pollIntervalSec: DEFAULT_POLL_INTERVAL_SEC,
+    monitoringPaused: false,
+    strobeApiKey: "",
+  });
+  const sec = normalizePollIntervalSec(data.pollIntervalSec);
+  if (sec !== data.pollIntervalSec) {
+    await chrome.storage.local.set({ pollIntervalSec: sec });
+  }
+  // Keep 1-min alarm as safety net even when offscreen ticks faster
+  chrome.alarms.create(ALARM, { periodInMinutes: 1 });
+
+  const wantTimer =
+    pollIntervalNeedsOffscreen(sec) &&
+    !data.monitoringPaused &&
+    !!normalizeApiKey(data.strobeApiKey);
+
+  await ensureOffscreen();
+  try {
+    await chrome.runtime.sendMessage({
+      type: "SET_POLL_CADENCE",
+      seconds: wantTimer ? sec : 0,
+    });
+  } catch (_) {
+    /* offscreen not ready — alarm still polls */
   }
 }
 
@@ -206,7 +243,8 @@ async function recordHistorySight(sight) {
   return { ok: true, entry };
 }
 
-async function pollOnce() {
+async function pollOnce(opts = {}) {
+  const force = !!opts.force;
   const now = Date.now();
   if (now < backoffUntil) return;
 
@@ -217,7 +255,15 @@ async function pollOnce() {
     mute: false,
     volume: 0.5,
     monitoringPaused: false,
+    pollIntervalSec: DEFAULT_POLL_INTERVAL_SEC,
   });
+
+  const intervalSec = normalizePollIntervalSec(cfg.pollIntervalSec);
+  if (!force && lastPollStartedAt) {
+    const minGap = Math.max(5, intervalSec) * 1000 * 0.85;
+    if (now - lastPollStartedAt < minGap) return;
+  }
+  lastPollStartedAt = now;
 
   const healedKey = normalizeApiKey(cfg.strobeApiKey);
   if (healedKey && healedKey !== String(cfg.strobeApiKey || "").trim()) {
@@ -348,17 +394,17 @@ async function pollOnce() {
 
 chrome.runtime.onInstalled.addListener(async () => {
   await loadPersistedMonitor();
-  chrome.alarms.create(ALARM, { periodInMinutes: 1 });
   if (!FEATURES.birdBrain) {
     chrome.storage.local.remove(["history", "birdBrainLog", "alertSoundCustom"]);
   }
-  pollOnce();
+  await syncPollCadence();
+  pollOnce({ force: true });
 });
 
 chrome.runtime.onStartup.addListener(async () => {
   await loadPersistedMonitor();
-  chrome.alarms.create(ALARM, { periodInMinutes: 1 });
-  pollOnce();
+  await syncPollCadence();
+  pollOnce({ force: true });
 });
 
 chrome.alarms.onAlarm.addListener((a) => {
@@ -370,12 +416,22 @@ chrome.runtime.onMessage.addListener((msg, _s, sendResponse) => {
     onIconFlashTick().finally(() => sendResponse({ ok: true }));
     return true;
   }
+  if (msg?.type === "POLL_TICK") {
+    pollOnce().finally(() => sendResponse({ ok: true }));
+    return true;
+  }
   if (msg?.type === "PING") {
     sendResponse({ ok: true });
     return false;
   }
   if (msg?.type === "FORCE_POLL") {
-    pollOnce().then(() => sendResponse({ ok: true }));
+    pollOnce({ force: true }).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg?.type === "SYNC_POLL_CADENCE") {
+    syncPollCadence()
+      .then(() => sendResponse({ ok: true }))
+      .catch((e) => sendResponse({ ok: false, error: String(e?.message || e) }));
     return true;
   }
   if (msg?.type === "SEARCH_ORDER") {
@@ -496,11 +552,18 @@ chrome.runtime.onConnect.addListener((port) => {
 // Storage relay - survives flaky sendMessage ports (Brave SW sleep)
 chrome.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
+  if (
+    Object.prototype.hasOwnProperty.call(changes, "pollIntervalSec") ||
+    Object.prototype.hasOwnProperty.call(changes, "strobeApiKey") ||
+    Object.prototype.hasOwnProperty.call(changes, "monitoringPaused")
+  ) {
+    syncPollCadence().catch(() => {});
+  }
   if (Object.prototype.hasOwnProperty.call(changes, "monitoringPaused")) {
     if (changes.monitoringPaused?.newValue) {
       setBadge("");
       setIconFlash(false);
-    } else pollOnce().catch(() => {});
+    } else pollOnce({ force: true }).catch(() => {});
   }
   if (!changes.birdSearchRequest?.newValue) return;
   const req = changes.birdSearchRequest.newValue;
@@ -523,7 +586,5 @@ chrome.storage.onChanged.addListener((changes, area) => {
     );
 });
 
-// Ensure alarm exists when SW wakes without install/startup events
-loadPersistedMonitor().then(() => {
-  chrome.alarms.create(ALARM, { periodInMinutes: 1 });
-});
+// Ensure alarm + cadence when SW wakes without install/startup events
+loadPersistedMonitor().then(() => syncPollCadence());
