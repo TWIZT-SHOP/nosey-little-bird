@@ -12,10 +12,9 @@ Staff keep Brave (or Chrome) running. Each person pastes their own Strobe Hub AP
 
 ## What you get
 
-- **Background queue watch** — badge = unfilled count; desktop alert + sound when orders age past your Bird Alert level
-- **Works while Strobe is closed** — HubSpot does not need to be open either for alerts
-- **Your key, your browser** — each person uses their own key from Hub settings
-- **Optional HubSpot helpers** — highlight order IDs, lookup HUD, dark tint (while live messages is open)
+- **Background queue watch** — badge = unfilled count; desktop alert + sound when Strobe orders age past your Bird Alert level (Strobe page does not need to stay open)
+- **Your key, your browser** — each person uses their own Hub API key from settings
+- **HubSpot helpers** (when live messages is open) — dark mode, one-click copy for order IDs / dodo codes, optional lookup HUD — not HubSpot alerts
 - **Who’s on shift** — after you unlock the schedule site once (or paste the CSV)
 
 ---
@@ -54,7 +53,7 @@ Staff keep Brave (or Chrome) running. Each person pastes their own Strobe Hub AP
 - Popup = local time, who’s on duty, queue snapshot
 - **1 ORDER** = alert as soon as something lands (handy on slow nights)
 - Red flash = something has sat **15+ minutes**
-- Alerts keep working with Strobe and HubSpot closed
+- Queue alerts keep working with the Strobe page closed (alerts are for the Hub queue, not HubSpot)
 
 ---
 
