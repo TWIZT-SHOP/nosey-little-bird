@@ -11,7 +11,8 @@
 | Hardening + docs for staff install | 2026-07-14 | 3 | Waiting-only alerts, release docs, 1-ORDER fix |
 | Poll cadence settings (15/30/60) + release 2.2.4 | 2026-07-16 | 2 | Sub-minute offscreen timer |
 | GitHub pitch README + social card + sale notes | 2026-07-17 | 2 | Tricky-ready public page |
-| **Total (rough)** | | **~23** | Round to **22–24** for quote buffer |
+| Voicebox/Bright restore (MCP) during pitch work | 2026-07-17 | 2 | Stack fix so marketing voice tools work |
+| **Total (rough)** | | **~25** | Round to **24–26** for quote buffer |
 
 ## What the hours bought
 
