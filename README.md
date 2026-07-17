@@ -51,7 +51,7 @@ Staff keep Brave (or Chrome) running. Each person pastes their own Strobe Hub AP
 
 - Badge = how many unfilled orders are waiting
 - Popup = local time, who’s on duty, queue snapshot
-- **1 ORDER** = alert as soon as something lands (handy on slow nights)
+- **1 ORDER** = alert once when a waiting order shows up (handy on slow nights). Already-seen orders stay quiet until they leave and come back — cycle the button back to **1 ORDER** to re-arm a ping for what’s in queue now.
 - Red flash = something has sat **15+ minutes**
 - Queue alerts keep working with the Strobe page closed (alerts are for the Hub queue, not HubSpot)
 

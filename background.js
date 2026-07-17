@@ -2,7 +2,6 @@ import { pullOrders, searchOrders, zeroOhVariants, normalizeApiKey, DEFAULT_BASE
 import {
   applyQueueSnapshot,
   ordersCrossingThreat,
-  ordersForOneAlert,
   markWhistled,
   queueHasLongWait,
 } from "./queue-monitor.js";
@@ -22,8 +21,6 @@ let backoffUntil = 0;
 let pollTick = 0;
 let iconFlashOn = false;
 let iconFlashWanted = false;
-/** Last threatLevel seen — detect switch into 1-ORDER so existing queue can ping once. */
-let lastThreatLevel = null;
 /** Throttle overlapping alarm + offscreen ticks. */
 let lastPollStartedAt = 0;
 
@@ -300,14 +297,8 @@ async function pollOnce(opts = {}) {
 
     memState = applyQueueSnapshot(memState, waiting, now);
     const threat = cfg.mute ? "off" : cfg.threatLevel;
-    const switchedIntoOne =
-      threat === "one" && lastThreatLevel != null && lastThreatLevel !== "one";
-    lastThreatLevel = threat;
-
-    const crossing =
-      threat === "one"
-        ? ordersForOneAlert(memState, prevById, switchedIntoOne)
-        : ordersCrossingThreat(memState, now, threat);
+    // "one" uses THREAT_SECONDS.one === 0 → alert once per waiting id (via whistled).
+    const crossing = ordersCrossingThreat(memState, now, threat);
 
     if (crossing.length && threat !== "off") {
       const isOne = threat === "one";
@@ -392,10 +383,21 @@ async function pollOnce(opts = {}) {
   }
 }
 
-chrome.runtime.onInstalled.addListener(async () => {
+chrome.runtime.onInstalled.addListener(async (details) => {
   await loadPersistedMonitor();
   if (!FEATURES.birdBrain) {
     chrome.storage.local.remove(["history", "birdBrainLog", "alertSoundCustom"]);
+  }
+  // After update: re-arm 1-ORDER so a quiet day with a live queue can ping once.
+  if (details?.reason === "update") {
+    const cfg = await chrome.storage.local.get({
+      threatLevel: "high",
+      mute: false,
+    });
+    if (!cfg.mute && cfg.threatLevel === "one") {
+      memState = { ...memState, whistled: {} };
+      await saveMonitor();
+    }
   }
   await syncPollCadence();
   pollOnce({ force: true });
@@ -564,6 +566,17 @@ chrome.storage.onChanged.addListener((changes, area) => {
       setBadge("");
       setIconFlash(false);
     } else pollOnce({ force: true }).catch(() => {});
+  }
+  // Entering 1-ORDER: clear whistled so current waiting orders can ping once.
+  if (
+    changes.threatLevel &&
+    changes.threatLevel.newValue === "one" &&
+    changes.threatLevel.oldValue !== "one"
+  ) {
+    memState = { ...memState, whistled: {} };
+    saveMonitor()
+      .then(() => pollOnce({ force: true }))
+      .catch(() => {});
   }
   if (!changes.birdSearchRequest?.newValue) return;
   const req = changes.birdSearchRequest.newValue;

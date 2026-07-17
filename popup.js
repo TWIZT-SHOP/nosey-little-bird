@@ -797,14 +797,25 @@ function updateUI() {
 
 // Keep your existing Toggle, Volume, and Alarm listeners exactly as they are...
 document.getElementById('threatToggle').onclick = () => {
-    chrome.storage.local.get({ threatLevel: 'high', mute: false }, (d) => {
+    chrome.storage.local.get({ threatLevel: 'high', mute: false, queueMonitorState: null }, (d) => {
         let nextT = d.threatLevel, nextM = false;
         if (d.mute) { nextT = 'high'; nextM = false; }
         else if (d.threatLevel === 'high') nextT = 'medium';
         else if (d.threatLevel === 'medium') nextT = 'low';
         else if (d.threatLevel === 'low') nextT = 'one';
         else nextM = true; // one (or unknown) → OFF
-        chrome.storage.local.set({ threatLevel: nextT, mute: nextM }, updateUI);
+        const patch = { threatLevel: nextT, mute: nextM };
+        // Fresh 1-ORDER: allow a ping for orders already sitting in the queue.
+        if (nextT === 'one' && !nextM) {
+            const prev = d.queueMonitorState || { byId: {}, whistled: {} };
+            patch.queueMonitorState = { ...prev, whistled: {} };
+        }
+        chrome.storage.local.set(patch, () => {
+            updateUI();
+            if (nextT === 'one' && !nextM) {
+                chrome.runtime.sendMessage({ type: 'FORCE_POLL' }).catch(() => {});
+            }
+        });
     });
 };
 
