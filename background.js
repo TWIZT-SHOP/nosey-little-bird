@@ -24,20 +24,42 @@ let iconFlashWanted = false;
 /** Throttle overlapping alarm + offscreen ticks. */
 let lastPollStartedAt = 0;
 
+async function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+async function pingOffscreen() {
+  try {
+    const r = await chrome.runtime.sendMessage({ type: "PING_OFFSCREEN" });
+    return !!(r && r.ok);
+  } catch (_) {
+    return false;
+  }
+}
+
 async function ensureOffscreen() {
+  if (await pingOffscreen()) return;
+
   const contexts = await chrome.runtime.getContexts?.({
     contextTypes: ["OFFSCREEN_DOCUMENT"],
   });
-  if (contexts && contexts.length) return;
-  try {
-    await chrome.offscreen.createDocument({
-      url: "offscreen.html",
-      reasons: ["AUDIO_PLAYBACK"],
-      justification:
-        "Play Bird Alert sound and run optional sub-minute Hub queue poll timer",
-    });
-  } catch (_) {
-    /* already exists */
+  if (!contexts?.length) {
+    try {
+      await chrome.offscreen.createDocument({
+        url: "offscreen.html",
+        reasons: ["AUDIO_PLAYBACK"],
+        justification:
+          "Play Bird Alert sound and run optional sub-minute Hub queue poll timer",
+      });
+    } catch (_) {
+      /* already exists / racing create */
+    }
+  }
+
+  // Wait until offscreen.js has registered listeners (create ≠ ready).
+  for (let i = 0; i < 25; i++) {
+    if (await pingOffscreen()) return;
+    await sleep(40);
   }
 }
 
@@ -71,21 +93,29 @@ async function syncPollCadence() {
 }
 
 async function playAlertSound(volume) {
-  await ensureOffscreen();
   const cfg = await chrome.storage.local.get({
     alertSoundId: DEFAULT_ALERT_SOUND,
     alertSoundCustom: "",
   });
   const src = resolveAlertSrc(cfg.alertSoundId, cfg.alertSoundCustom);
-  try {
-    return await chrome.runtime.sendMessage({
-      type: "PLAY_ALERT",
-      volume,
-      src,
-    });
-  } catch (e) {
-    return { ok: false, error: String(e?.message || e) };
+  let lastErr = "no attempt";
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await ensureOffscreen();
+    try {
+      const r = await chrome.runtime.sendMessage({
+        type: "PLAY_ALERT",
+        volume,
+        src,
+      });
+      if (r && r.ok !== false && !r.error) return { ok: true };
+      lastErr = String(r?.error || "offscreen returned not-ok");
+    } catch (e) {
+      lastErr = String(e?.message || e);
+    }
+    await sleep(120 * (attempt + 1));
   }
+  return { ok: false, error: lastErr };
 }
 
 /** @deprecated name kept for older call sites */
@@ -303,7 +333,8 @@ async function pollOnce(opts = {}) {
     if (crossing.length && threat !== "off") {
       const isOne = threat === "one";
       for (const id of crossing) {
-        chrome.notifications.create(`bird-threat-${id}-${now}`, {
+        // Stable id → replace, don't stack, if we retry sound next poll.
+        chrome.notifications.create(`bird-threat-${id}`, {
           type: "basic",
           iconUrl: "icon.png",
           title: isOne ? "Order in queue" : "Order past threat marker",
@@ -312,18 +343,23 @@ async function pollOnce(opts = {}) {
             : `${id} sitting too long - queue may need help`,
           priority: 2,
           requireInteraction: true,
+          silent: false,
         });
       }
       let soundOk = false;
       let soundErr = "";
       try {
         const sr = await playWhistle(cfg.volume);
-        soundOk = !!(sr && sr.ok !== false);
+        soundOk = !!(sr && sr.ok !== false && !sr.error);
         if (sr && sr.error) soundErr = String(sr.error);
+        if (!soundOk && !soundErr) soundErr = "sound did not play";
       } catch (e) {
         soundErr = String(e?.message || e);
       }
-      memState = markWhistled(memState, crossing);
+      // Only mark whistled after sound plays — silent fail used to eat the only ping.
+      if (soundOk) {
+        memState = markWhistled(memState, crossing);
+      }
       await chrome.storage.local.set({
         lastBirdAlertAt: now,
         lastBirdAlertIds: crossing,
@@ -428,6 +464,14 @@ chrome.runtime.onMessage.addListener((msg, _s, sendResponse) => {
   }
   if (msg?.type === "FORCE_POLL") {
     pollOnce({ force: true }).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  if (msg?.type === "TEST_ALERT_SOUND") {
+    chrome.storage.local
+      .get({ volume: 0.5 })
+      .then((cfg) => playAlertSound(cfg.volume))
+      .then((r) => sendResponse(r && r.ok !== false && !r.error ? { ok: true } : { ok: false, error: r?.error || "play failed" }))
+      .catch((e) => sendResponse({ ok: false, error: String(e?.message || e) }));
     return true;
   }
   if (msg?.type === "SYNC_POLL_CADENCE") {

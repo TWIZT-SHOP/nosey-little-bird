@@ -867,30 +867,23 @@ document.getElementById('customSoundFile')?.addEventListener('change', async (e)
 });
 
 document.getElementById('testAlarm').onclick = () => {
-    chrome.storage.local.get({
-        volume: 0.5,
-        alertSoundId: DEFAULT_ALERT_SOUND,
-        alertSoundCustom: '',
-    }, (data) => {
-        const vol = Math.min(2, Math.max(0, parseFloat(data.volume) || 0.5));
-        if (testAudio) testAudio.pause();
-        const src = resolveAlertSrc(data.alertSoundId, data.alertSoundCustom);
-        testAudio = new Audio(src);
-        if (!testCtx) {
-            testCtx = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        const node = testCtx.createMediaElementSource(testAudio);
-        testGainNode = testCtx.createGain();
-        testGainNode.gain.value = vol;
-        node.connect(testGainNode);
-        testGainNode.connect(testCtx.destination);
-        testAudio.play().catch((err) => {
-            const status = document.getElementById('customSoundStatus');
-            if (status) {
+    // Same offscreen path as real Bird Alerts (popup Audio alone can lie).
+    const status = document.getElementById('customSoundStatus');
+    if (status) {
+        status.style.color = '#888';
+        status.textContent = 'Playing via alert engine…';
+    }
+    chrome.runtime.sendMessage({ type: 'TEST_ALERT_SOUND' }, (resp) => {
+        const err = chrome.runtime.lastError?.message;
+        if (status) {
+            if (err || !resp?.ok) {
                 status.style.color = '#f44';
-                status.textContent = String(err?.message || err);
+                status.textContent = err || resp?.error || 'Sound failed — check Brave site sound / notification permission';
+            } else {
+                status.style.color = '#4caf50';
+                status.textContent = 'Alert sound OK (same path as queue alerts)';
             }
-        });
+        }
     });
 };
 

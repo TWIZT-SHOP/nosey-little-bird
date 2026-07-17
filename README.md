@@ -40,7 +40,7 @@ Staff keep Brave (or Chrome) running. Each person pastes their own Strobe Hub AP
    Use **your own** key. Don’t share it.
 3. Set **BIRD ALERT**: HIGH (4m) / MED (6m) / LOW (8m) / **1 ORDER** / OFF  
    (click the button to cycle)
-4. Optional: alert sound + volume (**TEST**), queue check speed (default is easy on your PC)
+4. Optional: alert sound + volume — hit **TEST** once (uses the real alert engine). Queue check speed default is easy on your PC.
 5. Open the schedule site once while logged in (for who’s on shift), or paste schedule CSV in Settings
 
 **Pause monitoring** stops queue checks and clears the badge. Order lookup still works.

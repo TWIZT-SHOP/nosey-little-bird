@@ -1,5 +1,7 @@
 let flashTimer = null;
 let pollTimer = null;
+/** Kept warm so Bird Alerts aren't blocked by autoplay after SW wake. */
+let audioCtx = null;
 
 function stopFlash() {
   if (flashTimer) {
@@ -26,11 +28,45 @@ function setPollCadence(seconds) {
       stopPollTimer();
     });
   }, ms);
-  // First tick soon so cadence change feels immediate
   chrome.runtime.sendMessage({ type: "POLL_TICK" }).catch(() => {});
 }
 
+async function ensureAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (self.AudioContext || self.webkitAudioContext)();
+  }
+  if (audioCtx.state === "suspended") {
+    await audioCtx.resume();
+  }
+  return audioCtx;
+}
+
+/** Decode + play via WebAudio (more reliable than HTMLAudioElement in offscreen). */
+async function playAlert(src, volume) {
+  const vol = Math.min(2, Math.max(0, Number(volume) || 0.5));
+  const url =
+    String(src || "").trim() || chrome.runtime.getURL("sounds/whistle.mp3");
+
+  const ctx = await ensureAudioCtx();
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`sound fetch ${res.status}`);
+  const raw = await res.arrayBuffer();
+  const buf = await ctx.decodeAudioData(raw.slice(0));
+  const gain = ctx.createGain();
+  gain.gain.value = vol;
+  const node = ctx.createBufferSource();
+  node.buffer = buf;
+  node.connect(gain);
+  gain.connect(ctx.destination);
+  node.start();
+  return { ok: true };
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === "PING_OFFSCREEN" || msg?.type === "PING") {
+    sendResponse({ ok: true, offscreen: true });
+    return false;
+  }
   if (msg?.type === "SET_POLL_CADENCE") {
     setPollCadence(msg.seconds);
     sendResponse({ ok: true });
@@ -55,41 +91,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
 
   if (msg?.type !== "PLAY_ALERT" && msg?.type !== "PLAY_WHISTLE") return;
 
-  const vol = Math.min(2, Math.max(0, Number(msg.volume) || 0.5));
-  const src =
-    String(msg.src || "").trim() ||
-    chrome.runtime.getURL("sounds/whistle.mp3");
-
-  try {
-    const audio = new Audio(src);
-    // HTMLMediaElement.volume caps at 1; boost via WebAudio when > 100%
-    if (vol <= 1) {
-      audio.volume = vol;
-      audio
-        .play()
-        .then(() => sendResponse({ ok: true }))
-        .catch((e) => sendResponse({ ok: false, error: String(e) }));
-      return true;
-    }
-
-    const ctx = new AudioContext();
-    const track = ctx.createMediaElementSource(audio);
-    const gain = ctx.createGain();
-    gain.gain.value = vol;
-    track.connect(gain);
-    gain.connect(ctx.destination);
-    audio.volume = 1;
-    audio
-      .play()
-      .then(() => sendResponse({ ok: true }))
-      .catch((e) => sendResponse({ ok: false, error: String(e) }));
-    audio.addEventListener("ended", () => {
-      try {
-        ctx.close();
-      } catch (_) {}
-    });
-  } catch (e) {
-    sendResponse({ ok: false, error: String(e?.message || e) });
-  }
+  playAlert(msg.src, msg.volume)
+    .then((r) => sendResponse(r))
+    .catch((e) => sendResponse({ ok: false, error: String(e?.message || e) }));
   return true;
 });
+
+// Warm the audio graph early so the first real alert is less likely to be blocked.
+ensureAudioCtx().catch(() => {});
