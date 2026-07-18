@@ -20,6 +20,32 @@ Click the bird icon (pin it so the badge stays visible).
 
 ---
 
+## Bird Alert levels
+
+Tap the big button to cycle. Color changes with the mode.
+
+| Mode | When it alerts |
+|------|----------------|
+| **HIGH (4m)** | Waiting order older than ~4 minutes |
+| **MED (6m)** | Waiting order older than ~6 minutes |
+| **LOW (8m)** | Waiting order older than ~8 minutes |
+| **1 ORDER** | Once when any waiting order shows up (slow nights) |
+| **OFF** | No queue sound / desktop alert |
+
+![HIGH](guide-alert-high.png)
+
+![MED](guide-alert-med.png)
+
+![LOW](guide-alert-low.png)
+
+![1 ORDER](guide-alert-one.png)
+
+![OFF](guide-alert-off.png)
+
+**1 ORDER tip:** already-seen orders stay quiet until they leave and come back. Cycle back to **1 ORDER** to re-arm a ping for what’s in queue now.
+
+---
+
 ## Settings — API key & queue watch
 
 Gear → Settings. Paste **your own** Hub key (don’t share it).

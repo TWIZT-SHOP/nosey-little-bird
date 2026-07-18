@@ -43,6 +43,12 @@ Click the bird. Tap **BIRD ALERT** to cycle levels. Gear opens Settings. Badge o
 
 ![Main popup](docs/guide-popup.png)
 
+Tap **BIRD ALERT** to cycle: HIGH (4m) → MED (6m) → LOW (8m) → 1 ORDER → OFF. See [all five modes](docs/STAFF-GUIDE.md#bird-alert-levels).
+
+| HIGH | MED | LOW | 1 ORDER | OFF |
+|:----:|:---:|:---:|:-------:|:---:|
+| ![HIGH](docs/guide-alert-high.png) | ![MED](docs/guide-alert-med.png) | ![LOW](docs/guide-alert-low.png) | ![1 ORDER](docs/guide-alert-one.png) | ![OFF](docs/guide-alert-off.png) |
+
 ### 2. Paste your API key
 
 ⚙ Settings → get your key at [strobe.gg/core/settings](https://strobe.gg/core/settings) → paste → **Save**. Use **your own** key. Don’t share it. You should see polling status under the buttons.
