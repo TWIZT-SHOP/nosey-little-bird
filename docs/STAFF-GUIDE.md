@@ -2,6 +2,8 @@
 
 How the bird looks after install, and what to do in Settings.
 
+Screenshots use placeholder names / demo order IDs — not live staff data.
+
 ---
 
 ## Main popup
